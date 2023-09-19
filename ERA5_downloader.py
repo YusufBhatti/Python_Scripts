@@ -13,7 +13,6 @@ The details of the cdsapi package are at https://pypi.org/project/cdsapi/
 
 Created on Sun Apr 19 13:49:26 2020
 
-@author: ajm226
 """
 
 import cdsapi

@@ -33,7 +33,7 @@ Contains:
     check_lat_lon
     make_seasonal_mean
 
-@author: Laura
+@author: YUSUF
 """
 from six.moves import cPickle as pickle
 import numpy as np
@@ -44,8 +44,9 @@ import time
 import scipy.io
 import matplotlib
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+#from mpl_toolkits.basemap import Basemap
 import scipy.interpolate as interpolate
+import xarray as xr
 
 def save_dict(di_, filename_): # TO SAVE A DICTIONARY INTO .NPY
     with open(filename_, 'wb') as f:
@@ -112,37 +113,6 @@ def month_shift(data): # Shifts months from Jan - Dec, to July - June
     return output
 
 
-def zonal_plot(clevs,y_axis_label,x,y,z,gridlines=True):
-    fig = plt.figure(figsize=(20,20), edgecolor='w')
-    ax = fig.add_subplot(1,1,1)
-    # ax.grid(linestyle='--',alpha=0.5) 
-    #plt.subplots_adjust(hspace=0.05, wspace=0.15)
-    ax.set_ylabel(y_axis_label,fontsize=20)
-    
-    
-    cs = ax.contourf(x,y,z,clevs=clevs,cmap='jet')
-    # ax1.set_yticks(y)
-    # ax1.set_yticklabels(y_labels)
-    # t=ax1.text(0.2,-35,'2003 - 19 Average',color='r',fontsize=22,fontweight='bold')
-    import  matplotlib
-    matplotlib.rcParams['font.sans-serif'] = "Arial"
-    matplotlib.rcParams['font.family'] = "sans-serif"
-    
-    label_size=20
-    mpl.rcParams['xtick.labelsize'] =label_size
-    mpl.rcParams['ytick.labelsize'] =label_size
-    
-    plt.rc('grid', color = 'black')
-    plt.rc('grid', alpha = 0.3) # alpha is percentage of transparency
-        
-    plt.rcParams['xtick.labelsize'] = 10
-    plt.rcParams['ytick.labelsize'] = 10
-    cax = fig.add_axes([0.94,0.54,0.03,0.34]) # Left, Bottom, Width, Height
-    cbar = fig.colorbar(cs,cax=cax,extend='both')
-    cbar.ax.set_ylabel('AOD',fontsize=25)
-    if gridlines:
-        plt.gca().gridlines(linestyle='--',alpha=0.5)
-
 ###############################################################################
 def t_lon(input_lon):
     #Reorders longitude from 0:360 to -180:180
@@ -186,7 +156,7 @@ def t_lon_array_360(input_lon,input_array):
     
     return output_array
 ###############################################################################
-def areaweight(x,latitude):
+def areaweight_numpy(x,latitude):
     #Area weights variable x by the cosine of the latitude.
     cos_lat = np.cos(latitude*np.pi/180)
     
@@ -229,12 +199,88 @@ def areaweight(x,latitude):
                 for k in range(0,s[2]):
                     for d in range (0,s[4]):
                         cost3m[i,j,k,:,d] = np.squeeze(cos_lat)
-        m = np.nansum(np.nansum(x*cost3m,4),2)/np.nansum(np.nansum(cost3m,4),2)	#time-lev-lat-lon	
-        
+        m = np.nansum(np.nansum(x*cost3m,4),3)/np.nansum(np.nansum(cost3m,4),3)	#time-lev-lat-lon	
+       
+    elif n==6:
+        cost3m = np.empty((s[0],s[1],s[2],s[3],s[4],s[5])); cost3m[:,:,:,:,:] = np.nan
+        for i in range(0,s[0]):
+            for j in range(0,s[1]):
+                for k in range(0,s[2]):
+                    for ll in range(0,s[3]):
+                        for d in range (0,s[5]):
+                            cost3m[i,j,k,ll,:,d] = np.squeeze(cos_lat)
+        m = np.nansum(np.nansum(x*cost3m,5),4)/np.nansum(np.nansum(cost3m,5),4)	#time-lev-lat-lon	
+
     output = m
     return output
 
+def areaweight(x, latitude):
+    import xarray as xr
+
+    cos_lat = np.cos(latitude * np.pi / 180)
+    lat_dim = list(x.dims)[-2]
+    lon_dim = list(x.dims)[-1]
+
+    x[lat_dim] = cos_lat.data
+    
+    s = x.shape
+    # Reshape cos_lat to match the desired shape
+    if len(s) == 2:
+        cos_lat_reshaped = xr.DataArray(cos_lat).expand_dims({lon_dim: s[-1]}, axis=[0])
+
+    if len(s) >= 3:
+        first_dim = list(x.dims)[0]
+    if len(s) == 3:
+        cos_lat_reshaped = xr.DataArray(cos_lat).expand_dims({first_dim: s[0], lon_dim: s[-1]}, axis=[0, 2])
+
+    if len(s) >= 4:
+        second_dim = list(x.dims)[1]
+    if len(s) == 4:
+        cos_lat_reshaped = xr.DataArray(cos_lat).expand_dims({first_dim: s[0], second_dim: s[1], lon_dim: s[-1]}, axis=[0,1, 3])
+
+    if len(s) >= 5:
+        third_dim = list(x.dims)[2]
+    if len(s) == 5:
+        cos_lat_reshaped = xr.DataArray(cos_lat).expand_dims({first_dim: s[0], second_dim: s[1], third_dim: s[2], lon_dim: s[-1]}, axis=[0,1,2, 4])
+
+    if len(s) >= 6:
+        fourth_dim = list(x.dims)[3]
+    if len(s) == 6:
+        cos_lat_reshaped = xr.DataArray(cos_lat).expand_dims({first_dim: s[0], second_dim: s[1], third_dim: s[2], fourth_dim: s[3], lon_dim: s[-1]}, axis=[0,1,2,3, 5])
+
+    m = (x * x[lat_dim]).sum(lon_dim).sum(lat_dim) / cos_lat_reshaped.sum(lon_dim).sum(lat_dim)
+    return m
+
+
+def areaweighted_std(x, latitude):
+    # Calculate the area-weighted mean of x
+    
+    area_weight = areaweight_numpy(x, latitude).data
+    if area_weight.ndim > 0:
+        mean = np.nanmean(area_weight)
+        mean = np.array(mean)
+    else:
+        mean=area_weight
+    # Subtract the mean from x to get the deviation of each element from the mean
+    deviation = x - mean
+
+    # Square the deviation to get the squared deviation of each element from the mean
+    squared_deviation = deviation**2
+
+    # Calculate the area-weighted mean of the squared deviations
+    mean_squared_deviation = areaweight_numpy(squared_deviation, latitude)
+
+    # Take the square root of the mean squared deviation to get the area-weighted standard deviation of x
+    std = np.sqrt(mean_squared_deviation)
+    if std.ndim>0:
+        std=np.nanmean(std)
+    return std,mean,area_weight
 ###############################################################################
+
+def percentage_difference(x1,x2):
+    return ((x2/x1)-1)*100
+###############################################################################
+
 def make_clim_std(x):
     #Organises x (single dimension array) into years and months, then
     #calculates the standard deviation over months to make a climatology.
@@ -296,7 +342,7 @@ def make_clim_std2(x):
             for i in range(0,n):
                 rearr[i,:] = (x[i*12:(12*(i+1)),la,lo])
 
-            data[:,la,lo] = np.std(rearr,axis=0,ddof=1)
+            data[:,la,lo] = np.nanstd(rearr,axis=0,ddof=1)
     return data
 
 ###############################################################################
@@ -455,7 +501,9 @@ def my_interpolate_4d(lat1,lon1,data1,lat2,lon2):
         data2[:,:,:] = np.nan
         for ti in range(0,ntime):
             data2[ti,:,:] = resample_2d(data1[ti,::-1,:], sample_pts, query_pts)
-    else:
+        output = data2[:,::-1,:]
+
+    if data1.ndim==4:
         if np.isnan(data1).any() == True:
         #Use the NaN helper!
             s = np.shape(data1) #assume 3 dimensions
@@ -477,8 +525,35 @@ def my_interpolate_4d(lat1,lon1,data1,lat2,lon2):
         for en in range(0,nens):
             for ti in range(0,ntime):
                 data2[en,ti,:,:] = resample_2d(data1[en,ti,::-1,:], sample_pts, query_pts)
+        output = data2[:,:,::-1,:]
+                
+    if data1.ndim==5:                
+        if np.isnan(data1).any() == True:
+        #Use the NaN helper!
+            s = np.shape(data1) #assume 5 dimensions
+            nansbegone = np.empty((s[0],s[1],s[2],s[3],s[4])); nansbegone[:,:,:,:] = np.nan
+            for a in range(0,s[0]):
+                for b in range(0,s[1]):
+                    for c in range(0,s[2]):
+                        for d in range(0,s[4]):
+                            y=data1[a,b,c,:,d]
+                            nans, x = nan_helper(y)
+                            y[nans] = np.interp(x(nans),x(~nans),y[~nans])
+                            nansbegone[a,b,c,:,d] = y
+            data1 = nansbegone      
         
-    output = data2[:,:,::-1,:]
+        ntimes= np.size(data1,2)             
+        ntime = np.size(data1,1)
+        nens = np.size(data1,0)
+
+        data2 = np.empty((nens,ntime,ntimes,np.size(lat2),np.size(lon2))) 
+        data2[:,:,:,:] = np.nan
+        for en in range(0,nens):
+            for ti in range(0,ntime):
+                for tis in range(0,ntimes):
+                    data2[en,ti,tis,:,:] = resample_2d(data1[en,ti,tis,::-1,:], sample_pts, query_pts)
+
+        output = data2[:,:,:,::-1,:]
     return output
 ###############################################################################
 def get_seasonal_var(data):
@@ -676,9 +751,9 @@ def check_lat_lon(lat,lon,array):
     from my_functions import t_lon
     from my_functions import t_lon_array
     #ensure lat runs N-S and lon runs 180W-180E
-#     if lat[0]<1:
-#         lat = lat[::-1]
-#         array = array[:,::-1,:]
+    if lat[0]>1:
+        lat = lat[::-1]
+        array = array[::-1,:]
     if lon[-1]>180:
         array = t_lon_array(lon,array)
         lon = t_lon(lon)
@@ -700,9 +775,9 @@ def check_lev_lat_lon(lat,lon,array):
     from my_functions import t_lon
     from my_functions import t_lon_array
     #ensure lat runs N-S and lon runs 180W-180E
-    if lat[0]<1:
+    if lat[0]>1:
         lat = lat[::-1]
-        array = array[:,:,::-1,:]
+        array = array[:,:,::-1]
     if lon[-1]>180:
         array = t_lon_array(lon,array)
         lon = t_lon(lon)
@@ -713,9 +788,9 @@ def check_lev_lat_lon_model(lat,lon,array):
     from my_functions import t_lon_360
     from my_functions import t_lon_array
     #ensure lat runs N-S and lon runs 180W-180E
-    if lat[0]<1:
-        lat = lat[::-1]
-        array = array[:,:,::-1,:]
+#     if lat[0]<1:
+#         lat = lat[::-1]
+#         array = array[:,:,::-1,:]
     if lon[-1]<180:
         array = t_lon_array(lon,array)
         lon = t_lon_360(lon)        
@@ -735,3 +810,18 @@ def make_seasonal_mean(array):
 
 
         
+def Normalization_nan(data0,data1):
+    """ 
+    the data should be flattened containing
+    all what is wanted to use to compare. 
+    data0 = a dataset used (such as atmos DMS)
+    data1 = a different kind of data showing connected to data 1 (such as oceanic DMS) 
+    """
+    TAN_nan= data0[np.logical_not(np.isnan(data1))]
+    TAN_MODIS_nan= data1[np.logical_not(np.isnan(data1))]
+    TAN_nan=np.where(np.isnan(TAN_nan),0,TAN_nan)
+
+    norm_dms=Normalization(TAN_nan)
+    norm_flux=Normalization(TAN_MODIS_nan)
+    r2=np.corrcoef(norm_flux,norm_dms)[0][1]**2
+    return r2

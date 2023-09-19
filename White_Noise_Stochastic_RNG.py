@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# This code processes MODIS data, creating a probability distribution function (PDF), cumulative distribution function (CDF), and generating stochastic data based on the CDF
 
 ################# Copy of: White_Noise_Stochastic_RNG ################
 ########## Made to TEST that above file, for trouble shooting reasons ########
@@ -10,8 +10,7 @@
 ############ Then Creates a RNG for EACH cell and supply's a RANDOM number from this ##########
 ############ Generator. This is in the UKESM1 grid (144,192) 30 times (30 days). #############
 
-
-# CMIP 6 
+# Import necessary libraries
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,8 +30,8 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from scipy.stats import sem
 import gc
-AOD=[]
 import xarray as xr
+
 #from my_functions import *
 os.chdir("/nesi/project/niwa02757/ybh10/CMIP6/UKESM1/Historic/")
 def calc_pdf(data, left, right, nbins):
@@ -154,31 +153,18 @@ modis_data_2=xr.open_dataset('/home/ybh10/Observational_Data/MODIS/CHL/Daily/202
 olat=modis_data_2.lat.data
 olon=modis_data_2.lon.data
 
-# year = ['2009','2010','2011','2012','2013','2014','2015','2016','2017','2018']
-# month='01'
-# day=[1,10,20,30]
-# month_chl=np.empty((10,4,4320,8640)); month_chl[:]=np.nan
-# year_count=0
-# day_count=0
-# for y in range(2003,2019):
-#     for d in (day):
-#         modis_data=xr.open_dataset('/home/ybh10/Observational_Data/MODIS/CHL/Monthly/UKESM_GRID/regrid-g4.timeAvgMap.MODISA_L3m_CHL_8d_4km_2018_chlor_a.{:02d}01{:02d}-{:02d}01{:02d}.180W_90S_180E_90N.nc'.format(y,d,y,d)).MODISA_L3m_CHL_8d_4km_2018_chlor_a
-#     #     print(np.nanmean(modis_data))
-#          #print('/home/ybh10/Objective_2/MODIS_CHL/g4.timeAvgMap.MODISA_L3m_CHL_8d_4km_2018_chlor_a.{}01{}-{}01{}.180W_90S_180E_90N.nc'.format(y,d,y,d))
-#         month_chl[year_count,day_count,:,:]=modis_data[:,:]  
-#         day_count=day_count+1
-#      #   print('day_count={}'.format(day_count))
-#     day_count=0
-#     year_count=year_count+1
-    #print('year_count={}'.format(year_count))
+# Open a UKESM1 dataset
 uk_data=xr.open_dataset('/home/ybh10/Objective_2/Post_Processed_Data/Control/one_day/DMS_CONCENTRATION_IN_SEAWATER_1950jan.nc')
+# Load MODIS data and other required data
 modis_new_data=np.load('/home/ybh10/Objective_2/Chlorophyll_Climatology/MODIS_CHL_UKESM_19YEAR.npy')
 modis_new_lat=uk_data.latitude
 modis_new_lon=uk_data.longitude
 
+# Define the number of bins and maximum concentration for CDF and PDF
 number_of_bins=10000
 max_concentration=50
 
+# Initialize arrays to store data
 cdf_modis_grid=np.empty((number_of_bins,144,192)); cdf_modis_grid[:]=np.nan
 cdf_modis_grid=np.empty((number_of_bins,144,192)); cdf_modis_grid[:]=np.nan
 latitude=np.empty((144)); latitude[:]=np.nan
@@ -193,57 +179,67 @@ median_chl=np.empty((144,192)); median_chl[:]=np.nan
 IQR=np.empty((144,192)); IQR[:]=np.nan
 
 
-# laty=np.arange(0,144,1)
-# lony=np.arange(0,192,1)
-
-
+# Initialize latitude and longitude coordinates - binned latitude/lon into the UKESM1 grid cell (144,192)
 laty=np.arange(0,4320,30)
 lony=np.arange(0,8629,45)
 la_co=-1
 lo_co=-1
+# Loop through latitude and longitude coordinates
 for la in (laty):
-    la_co=la_co+1
+    la_co = la_co + 1  # Increase the latitude coordinate counter
     for lo in (lony):
-        lo_co=lo_co+1
+        lo_co = lo_co + 1  # Increase the longitude coordinate counter
+        # Extract a subset of MODIS data for a specific latitude and longitude region
         data=(modis_new_data[:,la:la+30,lo:lo+45])
+        # Calculate the mean latitude and longitude for each grid cell
         latitude[la_co]=np.nanmean(modis_new_lat[la:la+30])
         longitude[lo_co]=np.nanmean(modis_new_lon[lo:lo+45])
+        # Calculate various statistics for the extracted data
         median_chl[la_co,lo_co]=np.nanmedian(data)
         std_chl[la_co,lo_co]=np.nanstd(data)
         Q1=np.nanquantile(data,.25); Q3=np.nanquantile(data,.75)
         IQR[la_co,lo_co]=Q3-Q1
         mean_chl[la_co,lo_co]=np.nanmean(data)
+        # Flatten the data for further processing into PDF/CDF
         modis_stats=data.flatten()
+        # Check if the mean of the flattened data is NaN
         if np.isnan(np.nanmean(modis_stats)) == True:
+            # If it's NaN, calculate PDF and CDF with NaN values
             obins, ofreq = calc_pdf(modis_stats, left=0, right=max_concentration, nbins=number_of_bins)
             cdf_modis_grid[:,la_co,lo_co] = np.nan            
         else:
+            # If it's not NaN, calculate PDF and CDF
             obins, ofreq = calc_pdf(modis_stats, left=0, right=max_concentration, nbins=number_of_bins)
             cdf_modis_grid[:,la_co,lo_co] = calc_cdf(ofreq)
-     #   modis_bins.append(obins)
+        # Store the PDF data in modis_freq
         modis_freq[count,:]=ofreq
         count=count+1
+        # Check if the longitude coordinate counter has reached its limit, and if so, reset it and print the latitude coordinate
         if lo_co == 191:
             lo_co=-1
             print(la_co)
-        
+        # Collect garbage to free up memory
         gc.collect()
 import random
-
+# Initialize data arrays for stochastic data
 count=0
 lat=[]
 lon=[]
 day=[]
-data_model=np.empty((30,144,192)); data_model[:]=np.nan
+data_model=np.empty((30,144,192)); data_model[:]=np.nan # 30 days, 144 lats, 192 lons
 data_modis=np.empty((30,144,192)); data_modis[:]=np.nan
+# Loop through time, latitude, and longitude to generate stochastic data
 for t in range(0,30):
     for la in range(0,144):
         for lo in range(0,192):
             n = round(random.uniform(0, 1.00000000), 8)# outputs a RANDOM number between 0.01 - 1 
-            occ=find_nearest(cdf_modis_grid[:,la,lo], n) # This points to the nearest value in the cdf to n MODIS
+            # Find the nearest value in the MODIS CDF to the random number
+            occ=find_nearest(cdf_modis_grid[:,la,lo], n)
+            # Check if the result is NaN, and if so, assign NaN to the stochastic data
             if np.isnan(occ) == True:
                 data_modis[t,la,lo]=np.nan
             else:
+                # Find the bin corresponding to the occurrence and assign the CHL concentration from that bin
                 bins=np.where(cdf_modis_grid[:,la,lo]==occ)[0][0] # The CHL bin which contains the that cdf occ value MODIS
                 CHL_CON=obins[bins]
                 data_modis[t,la,lo]=CHL_CON
@@ -252,11 +248,11 @@ print('Stochastic data shape should be 30,144,192, it is: {}'.format(np.shape(da
 print('Stochastic data mean should be >1, it is: {}'.format(np.nanmean(data_modis)))
 print('Stochastic Max CHL Concentration is: {}'.format((max_concentration)))
 print('Stochastic number of bins is: {}'.format((number_of_bins)))
-
+# Specify the bin number for file naming
 bin_number='{}_bins_{}'.format(number_of_bins,max_concentration)
-#grid='MODEL_Grid/Max_Concentration_{}/'.format(bin_number)
+# Change the current directory
 os.chdir("/home/ybh10/Objective_2/Numpy_Array/CDF/MODEL_Grid/Max_Concentration_{}/".format(bin_number))
-
+# Save various data arrays as numpy files
 np.save('MODEL_GRID_MODIS_BINS_{}'.format(bin_number),obins)  
 np.save('MODEL_GRID_MODIS_CDF_SO_MAX_{}'.format(bin_number),cdf_modis_grid)  
 np.save('MODEL_GRID_MODIS_modis_freq_SO_MAX_{}'.format(bin_number),modis_freq)      

@@ -6,7 +6,8 @@
 #module load 2022
 #module load IPython/8.5.0-GCCcore-11.3.0
 #module load JupyterHub/3.0.0-GCCcore-11.3.0
-
+cd ../Kaggle_Projects
+echo "into the Scripts for my project"
 export PATH=/home/ybhatti/yusufb/miniconda3/bin:$PATH
 source activate master
 
@@ -24,6 +25,6 @@ echo "http://localhost:${PORT}"
 /usr/bin/ssh -N -f -R $PORT:localhost:$PORT snellius
 
 
-
 jupyter-lab --no-browser --port $PORT #--NotebookApp.max_buffer_size=96636764160
 
+#ssh -N -J ybhatti@int4-pub.snellius.surf.nl ybhatti@tcn186.local.snellius.surf.nl -L 51525:localhost:51525

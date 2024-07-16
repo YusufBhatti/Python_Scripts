@@ -1,12 +1,12 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -t 15:00:00
-#SBATCH -p rome
+#SBATCH -p genoa
 
 #module load 2022
 #module load IPython/8.5.0-GCCcore-11.3.0
 #module load JupyterHub/3.0.0-GCCcore-11.3.0
-cd ../Kaggle_Projects
+cd ~
 echo "into the Scripts for my project"
 export PATH=/home/ybhatti/yusufb/miniconda3/bin:$PATH
 source activate master
@@ -24,6 +24,11 @@ echo "After connection is established in your local browser go to the address:"
 echo "http://localhost:${PORT}"
 /usr/bin/ssh -N -f -R $PORT:localhost:$PORT snellius
 
+echo "Connect to localhost" 
+sed -i "s|^ssh -N.*|ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT} &|" HPC_Python/ssh_connect.sh
+
+#ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT} &
+echo "connected to local host ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT}"
 
 jupyter-lab --no-browser --port $PORT #--NotebookApp.max_buffer_size=96636764160
 

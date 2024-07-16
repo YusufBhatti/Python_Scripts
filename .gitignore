@@ -1,4 +1,4 @@
-.ipynb_checkpoints/
+*.ipynb_checkpoints/
 1.ipynb
 Latin_Hypercube_Sampling.ipynb
 Nudging_Testing.ipynb
@@ -7,4 +7,5 @@ Testing_L31_v_L47.ipynb
 Untitled.ipynb
 __pycache__/
 svndiffwrap.sh
-
+slurm*
+backup

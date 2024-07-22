@@ -9,8 +9,8 @@
 cd ~
 echo "into the Scripts for my project"
 export PATH=/home/ybhatti/yusufb/miniconda3/bin:$PATH
-source activate master
-
+#source activate master
+source activate ESM
 ##PORT=`shuf -i 5000-5999 -n 1`
 PORT=51525
 #
@@ -25,10 +25,12 @@ echo "http://localhost:${PORT}"
 /usr/bin/ssh -N -f -R $PORT:localhost:$PORT snellius
 
 echo "Connect to localhost" 
-sed -i "s|^ssh -N.*|ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT} &|" HPC_Python/ssh_connect.sh
+sed -i '6c\ssh -N -J '"${USER}"'@'"${LOGIN_HOST}"' '"${USER}"'@'"${BATCH_HOST}"' -L '"${PORT}"':localhost:'"${PORT}"' &' HPC_Python/ssh_connect.sh
 
+#exit
 #ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT} &
 echo "connected to local host ssh -N -J ${USER}@${LOGIN_HOST} ${USER}@${BATCH_HOST} -L ${PORT}:localhost:${PORT}"
+. HPC_Python/ssh_connect.sh &
 
 jupyter-lab --no-browser --port $PORT #--NotebookApp.max_buffer_size=96636764160
 

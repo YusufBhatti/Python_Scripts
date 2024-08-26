@@ -11,4 +11,3 @@ export PATH=/nesi/project/niwa02757/ybh10/miniconda3/bin:$PATH
 source activate master
 
 #python /Scripts/PP_Chem_DMS.ipynb
-python COPY_of_Interpolating_CMIP6_Data_4_slurm.py

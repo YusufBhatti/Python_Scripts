@@ -33,7 +33,7 @@ Contains:
     check_lat_lon
     make_seasonal_mean
 
-@author: YUSUF
+@author: Laura
 """
 from six.moves import cPickle as pickle
 import numpy as np
@@ -47,6 +47,10 @@ import matplotlib.pyplot as plt
 #from mpl_toolkits.basemap import Basemap
 import scipy.interpolate as interpolate
 import xarray as xr
+
+def normalize(x):
+    return (x - x.min())/(x.max() - x.min())
+
 
 def save_dict(di_, filename_): # TO SAVE A DICTIONARY INTO .NPY
     with open(filename_, 'wb') as f:
@@ -825,3 +829,44 @@ def Normalization_nan(data0,data1):
     norm_flux=Normalization(TAN_MODIS_nan)
     r2=np.corrcoef(norm_flux,norm_dms)[0][1]**2
     return r2
+
+
+def calc_pdf(data, left, right, nbins):
+    '''
+    This is a function to calculate pdf
+data: data to calculate PDF must be 1D
+left: left bound of data
+right: right bound of data
+    nbins: number of bins
+    '''
+    data = data[~np.isnan(data)]
+    right = right-0.1
+    
+    bins = np.linspace(left, right, nbins)
+    
+    frequency = np.zeros(len(bins))
+    
+    for i in range(0,nbins):
+        if np.isnan(np.nanmean(data)) == False:
+            if i < nbins-1:
+                mask = (bins[i]<= data) & (data < bins[i+1])
+                frequency[i] = len(data[mask])/len(data)
+            else:
+                mask = data >= bins[i]
+                frequency[i] = len(data[mask])/len(data)
+        else:
+            frequency[i] = np.nan
+    return(bins,frequency)
+
+def Normalization(data):
+    mean = np.mean(data)
+    normalized_data = [x - mean for x in data]
+    std = np.std(normalized_data)
+    normalized_data = [x / std for x in normalized_data]
+    return normalized_data
+
+def calc_cdf(perd):
+    cpd = np.zeros(len(perd))
+    for i in range(0,len(perd)):
+        cpd[i] = perd[i]+ cpd[i-1]
+    return(cpd)
